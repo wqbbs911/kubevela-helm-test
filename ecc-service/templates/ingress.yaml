@@ -1,0 +1,83 @@
+{{- $fullName := include "ecc-service.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+{{- $lables := include "ecc-service.labels" . -}}
+{{- range .Values.ingresses }}
+{{- /*
+TKE 1.24.4 还未引入 IngressClass 资源和 ingressClassName 字段，Ingress 类仍由 kubernetes.io/ingress.class 注解指定；
+1.26 版本已经支持 Ingress Class Name，而 1.22 和 1.24 版本正在验证中，预计将于 202308 月中旬上线。
+在 TKE 引入 ingressClassName 后，或 多云需要时，再打开或修改以下判断逻辑
+*/}}
+{{- /*
+{{- if and .className (not (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .annotations "kubernetes.io/ingress.class" .className}}
+  {{- end }}
+{{- end }}
+*/}}
+{{- /* 
+  {{- if and .className (not (hasKey .annotations "kubernetes.io/ingress.class")) }}
+  {{- $_ := set .annotations "kubernetes.io/ingress.class" .className}}
+  {{- end }}
+*/}}  
+{{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" $.Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name }}-{{ .className }}
+  labels:
+    {{- $lables | nindent 4 }}
+  annotations:
+    {{- with .annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  # Kubernetes 1.18 版本以后，使用 spec.ingressClassName 代替 kubernetes.io/ingress.class
+  # TKE 中，spec.ingressClassName 不能与 kubernetes.io/ingress.class 共用
+  # 参考：https://kubernetes.io/zh-cn/docs/concepts/services-networking/ingress/#deprecated-annotation
+  {{- if and .className (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .className }}
+  {{- end }}
+  {{- if and .tlsEnabled .secretName }}
+  tls:
+    - hosts:
+        - {{ .host | quote }}
+      secretName: {{ .secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $.Release.Name }}
+                port: 
+                  number: {{ $svcPort }}
+    {{- range .hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+---
+{{- end }}

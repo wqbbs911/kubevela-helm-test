@@ -1,0 +1,57 @@
+{{- /* 通用 pvc( 单应用独占 pvc ) */}}
+
+{{- if and .Values.volumes.pvc.enabled (eq .Values.volumes.pvc.type "common") }}
+{{- range .Values.volumes.pvc.configs }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .claimName }}
+  labels:
+    app.kubernetes.io/name: {{ include "ecc-service.name" $ }}
+    helm.sh/chart: {{ include "ecc-service.chart" $ }}
+      #app.kubernetes.io/instance: {{ $.Release.Name }}
+      #app.kubernetes.io/managed-by: {{ $.Release.Service }}
+spec:
+  accessModes:
+    {{- range .accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: "{{ .storageSize }}"
+  storageClassName: "{{ .storageClassName }}"
+{{- end }}
+{{- end }}
+
+{{- /* 多应用间共享 pvc */}}
+
+{{- if and .Values.volumes.pvc.enabled (eq .Values.volumes.pvc.type "shared") }}
+{{ $static := .Values.volumes.pvc.static }}
+{{- range $p, $pvcc := .Values.volumes.pvc.configs }}
+{{ $pvName := printf "%s-pv-%d" $.Release.Namespace $p }}
+{{ $pvcName := printf "%s-pvc-%d" $.Release.Namespace $p }}
+{{- $sharedPVC := lookup "v1" "PersistentVolumeClaim" $.Release.Namespace $pvcName -}}
+{{- if not $sharedPVC }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvcName }}
+  annotations:
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    {{- range .accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: "{{ $pvcc.storageSize }}"
+  storageClassName: "{{ $pvcc.storageClassName }}"
+{{- if $static }}
+  volumeName: {{ $pvName }}
+{{- end }}  
+{{- end }}
+{{- end }}
+{{- end }}

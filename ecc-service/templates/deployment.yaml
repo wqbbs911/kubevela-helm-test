@@ -1,0 +1,255 @@
+{{- if eq .Values.workloadKind "Deployment"}}
+{{- $fullName := include "ecc-service.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "ecc-service.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ecc-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # prometheus 监控接口，todo
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "ecc-service.selectorLabels" . | nindent 8 }}
+        # 在pod中增加自定义label,用于个性化服务选择的需求
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        # SpringBoot 的 actuator 指标采集
+        {{- if .Values.actuatorExporter.enabled }}
+        app: actuator-exporter
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ecc-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Deployment 支持自定义的command 和 args
+          {{- if .Values.command }}
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.args }}
+          args:
+            {{- toYaml .Values.args | nindent 12 }}
+          {{- end }}
+          env:
+            # 配置访问nacos的环境变量
+          {{- if .Values.nacos.enabled }}
+          {{- range $k, $v := .Values.nacos.data }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
+          {{- end }}
+            # 配置其他自定义环境变量
+          {{- if .Values.envs.customer.enabled }}
+          {{- range $k, $v := .Values.envs.customer.data }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
+          {{- end }}
+          envFrom:
+            # 使用 ConfigMap 中的所有键值对作为容器环境变量
+          {{- if .Values.envs.configMap.enabled }}
+            - configMapRef:
+                name: {{ $fullName }}-env-configmap
+          {{- end }}
+            # 将 Secret 中的所有键值偶对定义为环境变量
+          {{- if .Values.envs.secret.enabled }}
+            - secretRef:
+                name: {{ $fullName }}-env-secret
+          {{- end }}
+          volumeMounts:
+          {{/* 
+          PVC 
+          */}}
+          {{- if .Values.volumes.pvc.enabled }}
+          {{- range $p, $pvcc := .Values.volumes.pvc.configs }}
+            {{- if  $pvcc.claimName }}
+            -name: {{ $pvcc.claimName }}-vol
+             {{- else }} 
+            - name: {{ $.Release.Namespace }}-pvc-{{ $p }}-vol
+            {{- end}}  
+              mountPath: {{ $pvcc.mountPath }}
+              {{- if $pvcc.readOnly }}
+              readOnly: {{ $pvcc.readOnly }}
+              {{- end }}
+              {{- if $pvcc.subPath }}              
+              subPath: {{ $pvcc.subPath }}
+              {{- else}}  
+              subPath: {{ $.Release.Namespace }}-{{ $p }}
+              {{- end}}
+          {{- end }}
+          {{- end }}
+          {{/*  
+          ConfigMap 
+          */}}
+          {{- if .Values.volumes.configMap.enabled }}
+          {{- range $i,$volume := .Values.volumes.configMap.configs }}
+            - name: {{ $fullName }}-vol{{ $i }}-configmap
+              mountPath: {{ $volume.mountPath }}
+              {{- if $volume.readOnly }}
+              readOnly: {{ $volume.readOnly }}
+              {{- end }}
+              {{- if $volume.subPath }}
+              subPath: {{ $volume.subPath }}
+              {{- end }}
+          {{- end }}
+          {{- end }}
+          {{/* 
+          Secret 
+          */}}
+          {{- if .Values.volumes.secret.enabled }}
+          {{- range $i,$volume := .Values.volumes.secret.configs }}
+            - name: {{ $fullName }}-vol{{ $i }}-secret
+              mountPath: {{ $volume.mountPath }}
+              {{- if $volume.readOnly }}
+              readOnly: {{ $volume.readOnly }}
+              {{- end }}
+          {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $svcPort }}
+              protocol: TCP
+          ## 健康检查
+          {{- with .Values.healthCheck }}
+          {{- if and .enabled .livenessPath }}
+          # 使用启动探针保护慢启动容器,并应在存活探针之前；启用后，liveness则不使用initialDelaySeconds
+          # 使用与存活探针相同的命令来设置启动探测
+          # 容器启动的最长时间为：failureThreshold * periodSeconds，单位：s
+          # https://kubernetes.io/zh-cn/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
+          startupProbe:
+            httpGet:
+              path: {{ .livenessPath }}
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ .livenessPath }}
+              port: http
+            periodSeconds: {{ .periodSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- if and .enabled .readinessPath }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: {{ .periodSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          # 为容器的生命周期事件设置处理函数
+          lifecycle:
+          {{- if .Values.lifecycle.postStart.enabled }}
+            postStart:
+              exec:
+                command:
+                  {{- toYaml .Values.lifecycle.postStart.command | nindent 18 }}
+          {{- end }}
+          {{- if .Values.lifecycle.preStop.enabled }}
+            preStop:
+              exec:
+                command:
+                  {{- toYaml .Values.lifecycle.preStop.command | nindent 18 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        # pvc
+        {{- if .Values.volumes.pvc.enabled }}
+        {{- range $p, $pvcc := .Values.volumes.pvc.configs }}
+        {{- if $pvcc.claimName }}
+        - name: {{ $pvcc.claimName }}-vol
+        {{- else }}
+        - name: {{ $.Release.Namespace }}-pvc-{{ $p }}-vol
+        {{- end }}   
+          persistentVolumeClaim:
+            {{- if $pvcc.claimName }}
+            claimName: {{ $pvcc.claimName }}
+            {{- else }}
+            claimName: {{ $.Release.Namespace }}-pvc-{{ $p }}
+            {{- end }}  
+        {{- end }}
+        {{- end }}
+        # configMap
+        {{- if .Values.volumes.configMap.enabled }}
+        {{- range $i, $volume := .Values.volumes.configMap.configs }}
+        - name: {{  $fullName }}-vol{{ $i }}-configmap
+          configMap:
+            {{- if $volume.defaultMode }}
+            defaultMode: {{ $volume.defaultMode }}
+            {{- end }}
+            name: {{ $fullName }}-vol{{ $i }}-configmap    
+        {{- end }}
+        {{- end }}
+        #  secret
+        {{- if .Values.volumes.secret.enabled }}
+        {{- range $i, $volume := .Values.volumes.secret.configs }}
+        - name: {{ $fullName }}-vol{{ $i }}-secret
+          secret:
+            {{- if $volume.defaultMode }}
+            defaultMode: {{ $volume.defaultMode }}
+            {{- end }}
+            secretName: {{ $fullName }}-vol{{ $i }}-secret
+        {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+      {{- if .Values.affinity }}
+        {{- with .Values.affinity }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      # pod 间反亲和性
+      {{- if .Values.podNotInSameAntiAffinity }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}
+                - key: app.kubernetes.io/instance
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname    
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}    
+{{- end }}

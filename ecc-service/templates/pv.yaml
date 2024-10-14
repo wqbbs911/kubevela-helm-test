@@ -1,0 +1,33 @@
+{{- /* 静态创建pv，须先创建cfs,多个pv绑定cfs /目录 */}}
+
+{{- if and .Values.volumes.pvc.enabled ( .Values.volumes.pvc.static) }}
+{{- range $p, $pvcc := .Values.volumes.pvc.configs }}
+{{ $pvName := printf "%s-pv-%d" $.Release.Namespace $p }}
+{{- $sharedPV := lookup "v1" "PersistentVolume" "" $pvName -}}
+{{- if not $sharedPV }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $pvName }}
+spec:
+  accessModes:
+    {{- range .accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  capacity:
+    storage: "{{ $pvcc.storageSize }}"
+  csi:
+    driver: com.tencent.cloud.csi.cfs
+    volumeAttributes:
+      fsid: {{ $pvcc.pvFsid }}
+      host: {{ $pvcc.pvHost }}
+      path: {{ default "/" $pvcc.pvPath }}
+      vers: "3"
+    volumeHandle: {{ $pvName }}
+  storageClassName: "{{ $pvcc.storageClassName }}"
+  persistentVolumeReclaimPolicy: Retain  
+  volumeMode: Filesystem
+{{- end }}
+{{- end }}
+{{- end }}

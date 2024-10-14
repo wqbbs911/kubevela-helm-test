@@ -1,0 +1,33 @@
+{{- if .Values.envs.configMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ecc-service.fullname" . }}-env-configmap
+  labels:
+    app.kubernetes.io/name: {{ include "ecc-service.name" . }}
+    helm.sh/chart: {{ include "ecc-service.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  {{- with .Values.envs.configMap.data }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+---
+{{- end }}
+
+{{- if .Values.volumes.configMap.enabled }}
+{{- range $i,$volume := .Values.volumes.configMap.configs }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ecc-service.fullname" $ }}-vol{{ $i }}-configmap
+  labels:
+    app.kubernetes.io/name: {{ include "ecc-service.name" $ }}
+    helm.sh/chart: {{ include "ecc-service.chart" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+data:
+  {{- toYaml .data | nindent 2 }}
+{{- end }}
+---
+{{- end }}

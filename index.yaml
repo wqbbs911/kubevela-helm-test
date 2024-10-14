@@ -1,0 +1,15 @@
+apiVersion: v1
+entries:
+  ecc-service:
+  - apiVersion: v2
+    appVersion: 3.0.1
+    created: "2024-10-14T17:37:24.186251078+08:00"
+    description: A Helm chart for ECC Applications
+    digest: d91e18a8b994165891c6f10a7e4808038e8fc81df5ce57ac52aac8857b1b7d55
+    icon: https://www.eclincloud.com/favicon.ico
+    name: ecc-service
+    type: application
+    urls:
+    - ecc-service-0.1.2.tgz
+    version: 0.1.2
+generated: "2024-10-14T17:37:24.179146864+08:00"

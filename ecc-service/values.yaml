@@ -1,0 +1,260 @@
+# Default values for ecc-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+# workload的类型, 类型的值参见 https://kubernetes.io/zh-cn/docs/concepts/workloads/
+# 在该chart中, 当前仅支持 Deployment(默认值) 和 StatefulSet
+workloadKind: Deployment
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+# app:
+#   version: stable
+
+defaultImagePullSecrets:
+  enabled: true
+
+imagePullSecrets:
+  - name: harbor-ops
+# 注释掉默认参数
+# nameOverride: ""
+# fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# 支持自定义设置容器启动时要执行的命令和参数
+# 相当于执行 shell 命令： $command $args
+# https://kubernetes.io/zh-cn/docs/tasks/inject-data-application/define-command-argument-container/
+command: []
+args: []
+
+podAnnotations: {}
+
+# pod中增加自定义label,用于单独定义服务选择
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  # 前端服务使用 80 端口，后端服务使用 8080 端口
+  port: 8080
+  # 提供 service 可以代理额外的多个端口的功能
+  extend: []
+
+healthCheck:
+  # readiness and liveness check use the same path via http scheme
+  livenessPath: ""
+  readinessPath: ""
+  enabled: false
+  # 执行探测的时间间隔（单位是秒）
+  periodSeconds: 15
+  # 探针在失败后，被视为成功的最小连续成功数,最小值为1
+  successThreshold: 1
+  # 探针连续失败了 failureThreshold 次之后， Kubernetes 认为总体上检查已失败：容器状态未就绪、不健康、不活跃。
+  failureThreshold: 3
+  # 探测的超时后等待的秒数
+  timeoutSeconds: 5
+  # 优雅关闭服务： kubelet 配置从为失败的容器触发终止操作到强制容器运行时停止该容器之前等待的宽限时长。
+  # 默认值是继承 Pod 级别的 terminationGracePeriodSeconds 值（如果不设置则为 30 秒），最小值为 1。
+  terminationGracePeriodSeconds: 30
+  
+# ingress 相关配置，列表，支持为单应用配置多个ingress,如同时设置内外网的ingress
+ingresses:
+  # ingressClassName，同时通过 className 区分内外网 ingress
+  - className: ""
+    # 指定公有云厂商
+    cloud: "tecentcloud"
+    # ingress controller 类型，非必须，className 中已包含 ingrss.class
+    # tecentcloud：qcloud（CLB类型ingress）, nginx（nginx-ingress）,traefik
+    class: nginx
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx # 已单独抽出名为 class 的 key
+      # kubernetes.io/tls-acme: "true"
+    # ingress 使用 SSL 证书
+    tlsEnabled: false
+    # 证书类型的 secret 名称，默认域名的证书
+    secretName: "ops-net-internal-tls"
+    # 支持 SSL 证书的扩展配置, ingress.yaml 中暂未实现，当前支持默认域名的证书，预留扩展
+    # tlses: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local  
+    host: hart-example.dev.eclincloud.net
+    # 支持多域名的扩展配置
+    hosts: []
+      # - host: hart-example.dev.eclincloud.net
+      #   paths:
+      #     - path: /
+      #       pathType: ImplementationSpecific
+
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# 为容器的生命周期事件设置处理函数
+lifecycle:
+  postStart:
+    enabled: false
+    command: ["/bin/sh", "-c", "echo Hello from the postStart handler > /usr/share/message"]
+  preStop:
+    enabled: false
+    command: ["/bin/sh","-c","nginx -s quit; while killall -0 nginx; do sleep 1; done"]
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# pod 间反亲和性
+# https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+podNotInSameAntiAffinity: true
+
+# envs（环境变量）和 volumes（存储卷）独立配置
+# envs 可以以 env 和 envFrom 的方式同时使用env、configmap、secret三种方式直接赋值,
+# volumes可以使用configmap,pvc两种方式
+envs:
+  customer:
+    enabled: false
+    data: {}
+  configMap:
+    enabled: false
+    data: {}
+  secret:
+    enabled: false
+    data: {}  
+
+volumes:
+  ## 通用 pvc(单应用独占 pvc )
+  pvc:
+    enabled: false
+    ## pvc 类型，可选值：
+    ## common   通用 pvc，即单应用独占 pvc，默认值；
+    ## shared   多应用间共享 pvc；目前子系统 ctms、etmf、rm 有该需求。
+    type: common
+    ## 是否静态创建pv,默认动态创建，当设置为true时，须设置pvName,pvfsid,pvhost
+    static: false
+    configs: []
+      # ## pvc 的生成和挂载；
+      # ## 当该 pvc 挂载到多mountPath 时，按 [] 格式指定多个 mountPath，pvc 信息保持一致；
+      # - mountPath: /data/eclincloud/downloads
+      #   ## 多应用间共享 pvc 时,这些应用的 claimName 必须相同,默认为namespace名称
+      #   claimName: dev-ctms-downloads-cfs
+      #
+      #   ## alertmanager data Persistent Volume access modes
+      #   ## Must match those of existing PV or dynamic provisioner
+      #   ## Ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+      #   ## TCloud：云硬盘仅支持单机读写，文件存储/对象存储支持支持多机读写；
+      #   accessModes:
+      #     - ReadWriteMany
+      #   storageSize: 10 Gi
+      #
+      #   ## storageClassName 为底层存储storageclass的名称，
+      #   ## 可选值：ecc-sc-disk-default、ecc-sc-nfs-default、sc-nfs-shared-default等，
+      #   ## 参考文档:http://wiki.eclincloud.net:8090/pages/viewpage.action?pageId=37849079
+      #   ## 同一应用多Pod间使用共享文件存储时，storageClassName 值应为 sc-nfs-shared-default 
+      #   ## 多应用间共享 pvc 时，storageClassName 值必须为 sc-nfs-shared-default 
+      #   storageClassName: ecc-sc-disk-default
+      #
+      #   ## 每个子系统单独使用一个存储， 所以挂载根目录即可
+      #   subPath: ""
+      #
+      ##  当static为true时生效
+      #   pvName默认为namespace名称
+      #   pvName: pv-nfs-shared-default  
+      #
+      #   pvfsid: 738m76f6
+      #   pvhost: 10.10.2.100
+      #   pv默认挂载路径为 /
+      #   pvPath: "/"
+      #
+      # - mountPath: /data/eclincloud/downloads
+      #   pvName: pv-nfs-shared-default2
+  pvcDynamic:
+    enabled: false
+    configs: []
+  configMap:
+    enabled: false
+    configs: []
+      #  deployment.yaml
+      #  模式位。.spec.template.spec.volumes[]，选填，用于投射文件的权限设置，默认为0644
+      # - defaultMode:
+      #   # .spec.template.spec.containers[].volumeMounts[]
+      #   mountPath:
+      #   readOnly: true
+      #   subPath:
+      #   # configmap.yaml
+      #   data: {}
+  secret:
+    enabled: false
+    configs: []
+
+nacos:
+  enabled: false
+  # env: dev
+  data: {}
+    # SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos-hs.nacos:8848
+    # SPRING_CLOUD_NACOS_CONFIG_NAMESPACE: dh-conf 
+    # SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos-hs.nacos:8848
+    # SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE: dev-ecc
+
+jmx:
+  enabled: false
+  port: 8081
+  authenticate: false
+  ssl: false
+
+actuatorExporter:
+  enabled: false
+  port: 8080
+  path: "/actuator/prometheus"
+
+# Pod 级别的优雅期 terminationGracePeriodSeconds 
+terminationGracePeriodSeconds: 30
+
+# 不建议使用该方式了, 建议统一使用 envs和volumes的方式。废弃。
+# persistence:
+#   # persistent volume config
+#   enabled: false
+#   existingClaim: some-pvc-vol
+#   mountPath: /
+#   readOnly: false
