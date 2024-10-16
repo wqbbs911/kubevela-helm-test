@@ -41,6 +41,9 @@ nacos:
     SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE: ecc
     SPRING_CLOUD_NACOS_DISCOVERY_GROUP: DEFAULT_GROUP
 envs:
+  secret:
+    enabled: false
+    data: {}  
   customer:
     enabled: true
     data:
@@ -71,3 +74,12 @@ volumes:
         pvFsid: "738m76f6"
         pvHost: "10.10.2.100"
         subPath: "ctms-downloads"
+  secret:
+    enabled: false
+    configs: []
+  pvcDynamic:
+    enabled: false
+    configs: []
+  configMap:
+    enabled: false
+    configs: []
