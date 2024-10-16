@@ -43,7 +43,10 @@ nacos:
 envs:
   secret:
     enabled: false
-    data: {}  
+    data: {}
+  configMap:
+    enabled: false
+    data: {}      
   customer:
     enabled: true
     data:
@@ -83,3 +86,10 @@ volumes:
   configMap:
     enabled: false
     configs: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
