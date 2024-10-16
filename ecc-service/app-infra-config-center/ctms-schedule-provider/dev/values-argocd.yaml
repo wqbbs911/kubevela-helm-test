@@ -1,10 +1,15 @@
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
 actuatorExporter:
   enabled: true
 
 replicaCount: 1
 image:
   repository: registry.ops.eclincloud.net/eclin-ctms/ctms-schedule-provider/ctms-schedule-provider
-  tag: "v3.2.3.000_release-2f600dbe-38393-302"
+  tag: "v3.2.3.000_release-9a315dfd-39276-308"
 service:
   type: ClusterIP
   port: 8080
