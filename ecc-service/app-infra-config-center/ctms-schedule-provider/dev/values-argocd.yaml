@@ -19,7 +19,7 @@ ingresses:
     class: nginx
     annotations: {}
     tlsEnabled: false
-    host: ctms-schedule-provider1.eclin-ctms.dev.eclincloud.net  
+    host: ctms-schedule-provider-vela-dev.eclin-ctms.dev.eclincloud.net  
 resources:
   requests:
     cpu: 50m
