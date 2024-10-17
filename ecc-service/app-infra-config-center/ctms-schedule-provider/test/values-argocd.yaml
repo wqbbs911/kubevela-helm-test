@@ -1,3 +1,9 @@
+workloadKind: Deployment
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
 actuatorExporter:
   enabled: true
 
@@ -5,6 +11,8 @@ replicaCount: 1
 image:
   repository: registry.ops.eclincloud.net/eclin-ctms/ctms-schedule-provider/ctms-schedule-provider
   tag: "v3.2.3.000_release-9a315dfd-39276-308"
+imagePullSecrets:
+  - name: harbor-ops    
 service:
   type: ClusterIP
   port: 8080
@@ -14,13 +22,13 @@ ingresses:
     class: nginx
     annotations: {}
     tlsEnabled: false
-    host: ctms-schedule-provider1.eclin-ctms.test.eclincloud.net  
+    host: ctms-schedule-provider-vela-test.eclin-ctms.test.eclincloud.net  
 resources:
   requests:
     cpu: 30m
-    memory: 512Mi
+    memory: 500Mi
   limits:
-    cpu: 500m
+    cpu: 100m
     memory: 2048Mi
 healthCheck:
   enabled: false
@@ -36,23 +44,27 @@ nacos:
     SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE: ecc
     SPRING_CLOUD_NACOS_DISCOVERY_GROUP: DEFAULT_GROUP
 envs:
+  secret:
+    enabled: false
+    data: {}
+  configMap:
+    enabled: false
+    data: {}
   customer:
     enabled: true
     data:
-      # # 容器启动端口，代码中默认为 8080；可在 nacos 中可设置 server.port: 8080,也可在此设置环境变量
+      # # 容器启动端口，代码中默认为 8080；可在 nacos 中可设置 server.port: 8080,也可在此设置环境变量, APP_SERVICE_NAME用于postStart和preStop脚本
       # ENV_PROJECT_SERVER_PORT: 8080
       #SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_BOOTSTRAP_ENABLED: true
       APP_SERVICE_NAME: ctms-schedule-provider
       JAVA_OPTS: -XX:+UseContainerSupport -XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 -XX:MinRAMPercentage=75.0  -XX:+UseG1GC
 lifecycle:
+  postStart:
+    enabled: true
   preStop:
     enabled: true
-    command:
-    - /bin/sh
-    - -c
-    - sleep 15
-volumes:      
+volumes:
   pvc:
     enabled: true
     type: shared
@@ -66,5 +78,37 @@ volumes:
         storageClassName: ecc-sc-nfs-shared-default
         ###   if pv static
         pvFsid: "yczuv7t8"
-        pvHost: "10.20.2.100"          
-        subPath: "ctms-downloads"          
+        pvHost: "10.20.2.100"
+        subPath: "ctms-downloads"
+  secret:
+    enabled: false
+    configs: []
+  pvcDynamic:
+    enabled: false
+    configs: []
+  configMap:
+    enabled: false
+    configs: []
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+# 为容器的生命周期事件设置处理函数
+lifecycle:
+  postStart:
+    enabled: false
+    #command: ["/bin/sh", "-c", "echo Hello from the postStart handler > /usr/share/message"]
+    command:
+      - /bin/sh
+      - -c
+      - init=true && while $init; do curl -X GET "http://${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}/nacos/v1/ns/instance/list?serviceName=${APP_SERVICE_NAME}&namespaceId=${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE}"|grep $(hostname -i) && { init=false;echo "$(date):${APP_SERVICE_NAME} is Online">>/var/log/app.log; } || { sleep 3; echo "$(date):${APP_SERVICE_NAME} is not onine, need Wait">>/var/log/app.log; };done
+  preStop:
+    enabled: false
+    #command: ["/bin/sh","-c","nginx -s quit; while killall -0 nginx; do sleep 1; done"]
+    command:
+      - /bin/sh
+      - -c
+      - init=true && while $init; do curl -sX PUT "http://${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}/nacos/v1/ns/instance?serviceName=${APP_SERVICE_NAME}&ip=$(hostname -i)&port=8080&enabled=true&namespaceId=${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE}&groupName=${SPRING_CLOUD_NACOS_DISCOVERY_GROUP}&weight=0" && { init=false;echo "$(date):${APP_SERVICE_NAME} is Offline">>/var/log/app.log;sleep 3; } || { sleep 3; echo "$(date):${APP_SERVICE_NAME} is not Offline, need Wait">>/var/log/app.log; };done 

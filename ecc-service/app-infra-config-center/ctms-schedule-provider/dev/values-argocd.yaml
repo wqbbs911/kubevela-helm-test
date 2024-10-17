@@ -25,10 +25,10 @@ ingresses:
     host: ctms-schedule-provider-vela-dev.eclin-ctms.dev.eclincloud.net  
 resources:
   requests:
-    cpu: 50m
-    memory: 1536Mi
+    cpu: 30m
+    memory: 500Mi
   limits:
-    cpu: 1000m
+    cpu: 100m
     memory: 2048Mi
 healthCheck:
   enabled: false
@@ -49,7 +49,7 @@ envs:
     data: {}
   configMap:
     enabled: false
-    data: {}      
+    data: {}
   customer:
     enabled: true
     data:
@@ -58,7 +58,7 @@ envs:
       #SPRING_PROFILES_ACTIVE: dev
       SPRING_CLOUD_BOOTSTRAP_ENABLED: true
       APP_SERVICE_NAME: ctms-schedule-provider
-      JAVA_OPTS: -XX:+UseContainerSupport -XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 -XX:MinRAMPercentage=75.0  -XX:+UseG1GC  
+      JAVA_OPTS: -XX:+UseContainerSupport -XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 -XX:MinRAMPercentage=75.0  -XX:+UseG1GC
 lifecycle:
   postStart:
     enabled: true
