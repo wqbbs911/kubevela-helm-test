@@ -1,3 +1,4 @@
+workloadKind: Deployment
 serviceAccount:
   create: true
   annotations: {}
