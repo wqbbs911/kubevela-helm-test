@@ -4,4 +4,4 @@ description: A Helm chart for ECC Applications
 icon: https://www.eclincloud.com/favicon.ico
 name: ecc-service
 type: application
-version: 0.1.5
+version: 0.1.6

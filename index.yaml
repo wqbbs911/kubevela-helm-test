@@ -3,7 +3,18 @@ entries:
   ecc-service:
   - apiVersion: v2
     appVersion: 3.0.1
-    created: "2024-10-17T10:05:06.638990999+08:00"
+    created: "2024-10-17T10:07:03.969371039+08:00"
+    description: A Helm chart for ECC Applications
+    digest: 4ff0938c62aa3695edd112e14dc18f40037d00791bf9ed20b1323b2620b8e2f9
+    icon: https://www.eclincloud.com/favicon.ico
+    name: ecc-service
+    type: application
+    urls:
+    - https://wqbbs911.github.io/kubevela-helm-test/ecc-service-0.1.6.tgz
+    version: 0.1.6
+  - apiVersion: v2
+    appVersion: 3.0.1
+    created: "2024-10-17T10:07:03.963258579+08:00"
     description: A Helm chart for ECC Applications
     digest: 21302ee3850e78a8c3fdd5e384292647986c7455aeed1ac9708db5f4ca5b7d90
     icon: https://www.eclincloud.com/favicon.ico
@@ -14,7 +25,7 @@ entries:
     version: 0.1.5
   - apiVersion: v2
     appVersion: 3.0.1
-    created: "2024-10-17T10:05:06.635443803+08:00"
+    created: "2024-10-17T10:07:03.957898974+08:00"
     description: A Helm chart for ECC Applications
     digest: e77bb0fb22751beea42e961717b0ce1480d2b3d4aca6fe602b22e096465a4708
     icon: https://www.eclincloud.com/favicon.ico
@@ -23,4 +34,4 @@ entries:
     urls:
     - https://wqbbs911.github.io/kubevela-helm-test/ecc-service-0.1.4.tgz
     version: 0.1.4
-generated: "2024-10-17T10:05:06.631273848+08:00"
+generated: "2024-10-17T10:07:03.954076349+08:00"
