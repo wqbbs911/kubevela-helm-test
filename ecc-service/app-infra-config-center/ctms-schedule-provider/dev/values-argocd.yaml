@@ -96,3 +96,19 @@ autoscaling:
   maxReplicas: 100
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
+# 为容器的生命周期事件设置处理函数
+lifecycle:
+  postStart:
+    enabled: false
+    #command: ["/bin/sh", "-c", "echo Hello from the postStart handler > /usr/share/message"]
+    command:
+      - /bin/sh
+      - -c
+      - init=true && while $init; do curl -X GET "http://${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}/nacos/v1/ns/instance/list?serviceName=${APP_SERVICE_NAME}&namespaceId=${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE}"|grep $(hostname -i) && { init=false;echo "$(date):${APP_SERVICE_NAME} is Online">>/var/log/app.log; } || { sleep 3; echo "$(date):${APP_SERVICE_NAME} is not onine, need Wait">>/var/log/app.log; };done
+  preStop:
+    enabled: false
+    #command: ["/bin/sh","-c","nginx -s quit; while killall -0 nginx; do sleep 1; done"]
+    command:
+      - /bin/sh
+      - -c
+      - init=true && while $init; do curl -sX PUT "http://${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR}/nacos/v1/ns/instance?serviceName=${APP_SERVICE_NAME}&ip=$(hostname -i)&port=8080&enabled=true&namespaceId=${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE}&groupName=${SPRING_CLOUD_NACOS_DISCOVERY_GROUP}&weight=0" && { init=false;echo "$(date):${APP_SERVICE_NAME} is Offline">>/var/log/app.log;sleep 3; } || { sleep 3; echo "$(date):${APP_SERVICE_NAME} is not Offline, need Wait">>/var/log/app.log; };done 
